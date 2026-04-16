@@ -1,0 +1,66 @@
+# Local / staging stack — production AI system blueprint
+# Usage: docker compose up -d
+services:
+  api:
+    build:
+      context: ./apps/api
+    environment:
+      - OLLAMA_BASE_URL=http://ollama:11434
+      - OLLAMA_MODEL=mistral-small:latest
+      - OLLAMA_EMBED_MODEL=nomic-embed-text
+      - QDRANT_URL=http://qdrant:6333
+      - APP_DB_PATH=/data/copilot.db
+    ports:
+      - "8000:8000"
+    volumes:
+      - api_data:/data
+    depends_on:
+      - qdrant
+    restart: unless-stopped
+
+  web:
+    image: node:20-alpine
+    working_dir: /app
+    command: sh -c "npm install && npm run dev"
+    environment:
+      - NEXT_PUBLIC_API_BASE_URL=http://localhost:8000
+    volumes:
+      - ./apps/web:/app
+    ports:
+      - "3000:3000"
+    depends_on:
+      - api
+    restart: unless-stopped
+
+  qdrant:
+    image: qdrant/qdrant:latest
+    ports:
+      - "6333:6333"
+      - "6334:6334"
+    volumes:
+      - qdrant_data:/qdrant/storage
+
+  # Optional: pull models on host with `ollama pull ...` — GPU recommended
+  ollama:
+    image: ollama/ollama:latest
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    profiles:
+      - llm
+
+  # Tracing / evals (pick one in prod or run both)
+  phoenix:
+    image: arizephoenix/phoenix:latest
+    ports:
+      - "6006:6006"
+    environment:
+      - PHOENIX_PORT=6006
+    profiles:
+      - observability
+
+volumes:
+  qdrant_data:
+  ollama_data:
+  api_data:

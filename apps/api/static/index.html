@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>SaaS Copilot</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: system-ui, sans-serif; background: #0b1220; color: #e5e7eb; }
+    main { max-width: 900px; margin: 0 auto; padding: 32px 16px; }
+    .panel {
+      background: #111827; border: 1px solid #1f2937; border-radius: 12px; padding: 16px; margin-top: 16px;
+    }
+    label { display: block; margin-top: 12px; font-size: 0.9rem; color: #9ca3af; }
+    input, textarea {
+      width: 100%; margin-top: 6px; border-radius: 8px; border: 1px solid #374151;
+      background: #0f172a; color: #e5e7eb; padding: 10px; font: inherit;
+    }
+    textarea { min-height: 120px; resize: vertical; }
+    button {
+      margin-top: 14px; background: #2563eb; color: white; border: none; border-radius: 8px;
+      padding: 10px 14px; cursor: pointer; font: inherit;
+    }
+    button:disabled { background: #475569; cursor: not-allowed; }
+    .answer { white-space: pre-wrap; line-height: 1.45; }
+    h4 { margin: 12px 0 8px; font-size: 1rem; }
+    hr { border: none; border-top: 1px solid #374151; margin: 16px 0; }
+    a { color: #93c5fd; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>SaaS Support Copilot</h1>
+    <p>Fallback-UI (ohne Node). API: gleicher Origin. Next.js-UI optional unter <code>npm run dev</code> in <code>apps/web</code>.</p>
+
+    <form class="panel" id="form">
+      <label for="workspace">Workspace ID</label>
+      <input id="workspace" type="text" value="default" />
+
+      <label for="message">Frage</label>
+      <textarea id="message" required placeholder="Wie antworten wir auf dieses Billing-Ticket?"></textarea>
+
+      <label for="context">Kontext (optional)</label>
+      <textarea id="context" placeholder="KB-Auszug, Ticket-Details, Policy …"></textarea>
+
+      <button type="submit" id="submit">Antwort erzeugen</button>
+    </form>
+
+    <div class="panel" id="errorPanel" style="display:none;">
+      <h3>Fehler</h3>
+      <div class="answer" id="errorText"></div>
+    </div>
+
+    <div class="panel" id="resultPanel" style="display:none;">
+      <h3>Copilot-Entwurf</h3>
+      <div class="answer" id="answer"></div>
+      <hr />
+      <p><strong>Model:</strong> <span id="model"></span></p>
+      <p><strong>Trace ID:</strong> <span id="trace"></span></p>
+      <h4>Zitate</h4>
+      <div id="citations"></div>
+    </div>
+  </main>
+  <script>
+    const form = document.getElementById("form");
+    const errorPanel = document.getElementById("errorPanel");
+    const resultPanel = document.getElementById("resultPanel");
+
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      errorPanel.style.display = "none";
+      resultPanel.style.display = "none";
+      const btn = document.getElementById("submit");
+      btn.disabled = true;
+      const message = document.getElementById("message").value.trim();
+      const context = document.getElementById("context").value.trim();
+      const workspace_id = document.getElementById("workspace").value.trim() || "default";
+      try {
+        const res = await fetch("/chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ workspace_id, message, context: context || null }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || res.statusText);
+        document.getElementById("answer").textContent = data.answer || "";
+        document.getElementById("model").textContent = data.model || "n/a";
+        document.getElementById("trace").textContent = data.trace_id || "n/a";
+        const cit = document.getElementById("citations");
+        cit.innerHTML = "";
+        const list = Array.isArray(data.citations) ? data.citations : [];
+        if (list.length === 0) {
+          cit.textContent = "Keine Zitate.";
+        } else {
+          list.forEach((c, i) => {
+            const div = document.createElement("div");
+            div.className = "panel";
+            div.innerHTML = "<p><strong>Quelle:</strong> " + (c.source || "") +
+              " (" + Math.round((c.score || 0) * 100) + "%)</p>" +
+              "<div class=\"answer\">" + (c.snippet || "") + "</div>";
+            cit.appendChild(div);
+          });
+        }
+        resultPanel.style.display = "block";
+      } catch (err) {
+        document.getElementById("errorText").textContent = err.message || String(err);
+        errorPanel.style.display = "block";
+      } finally {
+        btn.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>

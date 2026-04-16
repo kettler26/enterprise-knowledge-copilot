@@ -1,0 +1,5 @@
+# Optional: LlamaIndex + Qdrant + Ollama embeddings (parallel stack experiments)
+-r requirements.txt
+llama-index-core
+llama-index-vector-stores-qdrant
+llama-index-embeddings-ollama
