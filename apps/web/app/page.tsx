@@ -11,6 +11,7 @@ type Citation = {
 };
 
 export default function HomePage() {
+  const [apiKey, setApiKey] = useState("");
   const [workspaceId, setWorkspaceId] = useState("default");
   const [message, setMessage] = useState("");
   const [context, setContext] = useState("");
@@ -32,7 +33,10 @@ export default function HomePage() {
     try {
       const response = await fetch(`${API_BASE_URL}/chat`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": apiKey
+        },
         body: JSON.stringify({
           workspace_id: workspaceId || "default",
           message,
@@ -63,6 +67,16 @@ export default function HomePage() {
       </p>
 
       <form className="panel" onSubmit={onSubmit}>
+        <label htmlFor="apiKey">API Key</label>
+        <input
+          id="apiKey"
+          type="password"
+          value={apiKey}
+          onChange={(e) => setApiKey(e.target.value)}
+          placeholder="sk_live_..."
+          className="text-input"
+        />
+
         <label htmlFor="workspace">Workspace ID</label>
         <input
           id="workspace"

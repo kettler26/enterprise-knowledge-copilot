@@ -34,6 +34,9 @@
     <p>Fallback-UI (ohne Node). API: gleicher Origin. Next.js-UI optional unter <code>npm run dev</code> in <code>apps/web</code>.</p>
 
     <form class="panel" id="form">
+      <label for="apiKey">API Key</label>
+      <input id="apiKey" type="password" placeholder="sk_live_..." />
+
       <label for="workspace">Workspace ID</label>
       <input id="workspace" type="text" value="default" />
 
@@ -72,13 +75,17 @@
       resultPanel.style.display = "none";
       const btn = document.getElementById("submit");
       btn.disabled = true;
+      const apiKey = document.getElementById("apiKey").value.trim();
       const message = document.getElementById("message").value.trim();
       const context = document.getElementById("context").value.trim();
       const workspace_id = document.getElementById("workspace").value.trim() || "default";
       try {
         const res = await fetch("/chat", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            "x-api-key": apiKey
+          },
           body: JSON.stringify({ workspace_id, message, context: context || null }),
         });
         const data = await res.json();

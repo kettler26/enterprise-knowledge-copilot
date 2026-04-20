@@ -45,3 +45,37 @@ class ToolKbSearchRequest(BaseModel):
 class ToolKbSearchResponse(BaseModel):
     workspace_id: str
     hits: list[dict[str, Any]]
+
+
+class AdminCreateApiKeyRequest(BaseModel):
+    key_name: str = Field(..., min_length=1, max_length=100)
+    workspace_id: str = Field(..., min_length=1, max_length=100)
+    plan: str = Field(default="starter", pattern="^(starter|growth|enterprise)$")
+
+
+class AdminCreateApiKeyResponse(BaseModel):
+    key_name: str
+    workspace_id: str
+    plan: str
+    api_key: str
+
+
+class AdminIssueJwtRequest(BaseModel):
+    subject: str = Field(default="local-user")
+    workspace_id: str = Field(..., min_length=1, max_length=100)
+    plan: str = Field(default="starter", pattern="^(starter|growth|enterprise)$")
+    expires_minutes: int = Field(default=60, ge=5, le=10080)
+
+
+class AdminIssueJwtResponse(BaseModel):
+    workspace_id: str
+    plan: str
+    expires_minutes: int
+    access_token: str
+
+
+class ConnectorImportResponse(BaseModel):
+    workspace_id: str
+    connector: str
+    imported_documents: int
+    indexed_chunks: int

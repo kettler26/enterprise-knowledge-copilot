@@ -136,6 +136,36 @@ python -m uvicorn main:app --host 127.0.0.1 --port 8000 --reload
 
 Then open **http://127.0.0.1:8000/ui/** in the browser. If you changed the code and still get **404 on `/ui/`**, stop the old `uvicorn` process and start again so the static mount is loaded.
 
+### API authentication (required)
+
+Protected endpoints (`/chat`, `/ingest`, `/metrics/summary`, `/tools/kb-search`, connector endpoints) require either:
+
+- `x-api-key: ...`
+- `Authorization: Bearer <jwt>`
+
+- For local dev, seed keys with env: `API_KEYS=sk_dev_default:default:starter`
+- Or create keys via admin endpoint:
+  - set `ADMIN_BOOTSTRAP_TOKEN` env
+  - call `POST /admin/api-keys` with header `x-admin-token`
+
+Example (create starter key):
+
+```bash
+curl -X POST http://localhost:8000/admin/api-keys \
+  -H "x-admin-token: your-admin-token" \
+  -H "Content-Type: application/json" \
+  -d "{\"key_name\":\"local-dev\",\"workspace_id\":\"default\",\"plan\":\"starter\"}"
+```
+
+Example (issue JWT for same workspace):
+
+```bash
+curl -X POST http://localhost:8000/admin/jwt \
+  -H "x-admin-token: your-admin-token" \
+  -H "Content-Type: application/json" \
+  -d "{\"subject\":\"dev-user\",\"workspace_id\":\"default\",\"plan\":\"starter\",\"expires_minutes\":60}"
+```
+
 1. Start core services:
 
 ```bash
@@ -186,6 +216,7 @@ Chat request:
 
 ```bash
 curl -X POST http://localhost:8000/chat \
+  -H "x-api-key: sk_dev_default" \
   -H "Content-Type: application/json" \
   -d "{\"workspace_id\":\"default\",\"message\":\"Draft a concise reply for a billing issue\",\"context\":\"Policy: refund within 14 days for annual plans.\"}"
 ```
@@ -194,6 +225,7 @@ Ingest one knowledge document:
 
 ```bash
 curl -X POST http://localhost:8000/ingest \
+  -H "x-api-key: sk_dev_default" \
   -H "Content-Type: application/json" \
   -d "{\"workspace_id\":\"default\",\"source\":\"refund_policy\",\"content\":\"Annual plans can be refunded within 14 days from purchase date.\"}"
 ```
@@ -201,7 +233,7 @@ curl -X POST http://localhost:8000/ingest \
 Read metrics summary:
 
 ```bash
-curl "http://localhost:8000/metrics/summary?workspace_id=default"
+curl -H "x-api-key: sk_dev_default" "http://localhost:8000/metrics/summary?workspace_id=default"
 ```
 
 Capabilities (feature flags):
@@ -214,9 +246,36 @@ KB search tool (vector retrieval for agents):
 
 ```bash
 curl -X POST http://localhost:8000/tools/kb-search \
+  -H "x-api-key: sk_dev_default" \
   -H "Content-Type: application/json" \
   -d "{\"workspace_id\":\"default\",\"query\":\"refund policy\",\"limit\":5}"
 ```
+
+Connector imports (read-only):
+
+```bash
+curl -X POST "http://localhost:8000/connectors/notion/import?workspace_id=default&limit=5" \
+  -H "x-api-key: sk_dev_default"
+
+curl -X POST "http://localhost:8000/connectors/zendesk/import?workspace_id=default&limit=10" \
+  -H "x-api-key: sk_dev_default"
+```
+
+Connector imports are incremental by workspace (`connector_sync_state` cursor), with retry/backoff on upstream API errors.
+
+Start periodic connector scheduler:
+
+```bash
+python scripts/run_connector_scheduler.py
+```
+
+Configure scheduler via env:
+
+- `CONNECTOR_SYNC_WORKSPACES=default,acme`
+- `CONNECTOR_SYNC_CONNECTORS=notion,zendesk`
+- `CONNECTOR_SYNC_INTERVAL_SECONDS=300`
+- `NOTION_SYNC_LIMIT=10`
+- `ZENDESK_SYNC_LIMIT=20`
 
 Expected behavior:
 
@@ -241,24 +300,45 @@ Expected behavior:
 
 ### Phase 2 — Product hardening (partial / next)
 
-- [ ] Multi-tenant auth (API keys / JWT), workspace isolation beyond string IDs
-- [ ] Billing meters + plan enforcement
-- [ ] Curated eval dataset + regression tests on `/chat`
-- [ ] First-party connectors (Zendesk / Notion read-only) behind feature flags
-- [ ] Stdio MCP server wrapping HTTP tools (optional; HTTP bridge exists)
+- [x] Multi-tenant auth baseline (API key + JWT + workspace scope checks)
+- [x] Billing meters + plan enforcement baseline (`chat_run` quota by plan)
+- [x] Curated regression tests baseline on `/chat` (`tests/test_chat_auth.py`)
+- [x] Connector sync baseline with delta cursor + retry (`/connectors/notion/import`, `/connectors/zendesk/import`)
+- [x] Stdio MCP wrapper baseline (`packages/mcp-servers/kb-search-stdio.py`)
 
 ### Phase 3 — Scale & differentiation
 
 - [ ] LlamaIndex path (optional install: `requirements-llamaindex.txt`) for advanced retrieval experiments
 - [ ] Streamlit or internal admin dashboards (Next.js remains primary UI)
-- [ ] Cloudflare Workers / Hugging Face Spaces deployment templates
+- [x] Cloudflare Workers / Hugging Face Spaces deployment templates
 
 ## Next build items (production hardening)
 
-- Add tenant isolation and role-based access checks
+- Add tenant isolation and role-based access checks (RBAC levels)
 - Add LlamaIndex-backed retrieval path (optional dependency pack)
-- Add billing events and plan enforcement for paid workspaces
-- Add stdio MCP server (thin wrapper) once connector scope is fixed
+- Add billing events and plan enforcement for paid workspaces (invoice/export layer)
+- Add connector background scheduler (periodic sync + dead-letter handling)
+
+## DevOps & smoke tests
+
+- CI: `.github/workflows/ci.yml`
+- Smoke scripts: `scripts/smoke_test.sh`, `scripts/smoke_test.ps1`
+- Deploy templates:
+  - Cloudflare Worker proxy: `deploy/cloudflare-worker/`
+  - Hugging Face Space (Docker): `deploy/hf-space/`
+
+Run smoke test (PowerShell):
+
+```powershell
+$env:API_KEY="sk_dev_default"
+powershell -ExecutionPolicy Bypass -File .\scripts\smoke_test.ps1
+```
+
+Run smoke test (bash):
+
+```bash
+API_KEY=sk_dev_default bash ./scripts/smoke_test.sh
+```
 
 ## Commercial execution docs
 

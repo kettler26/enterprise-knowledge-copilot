@@ -1,5 +1,6 @@
 copilot.db
 analytics.duckdb
+analytics.duckdb.wal
 __pycache__/
 *.pyc
 .env

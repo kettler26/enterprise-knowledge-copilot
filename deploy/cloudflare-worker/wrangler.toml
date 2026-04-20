@@ -1,0 +1,12 @@
+name = "enterprise-knowledge-copilot-proxy"
+main = "worker.js"
+compatibility_date = "2026-04-20"
+
+[vars]
+COPILOT_API_BASE_URL = "https://your-api-domain.example.com"
+name = "saas-copilot-worker"
+main = "worker.js"
+compatibility_date = "2026-04-20"
+
+[vars]
+COPILOT_API_BASE_URL = "https://your-api.example.com"
